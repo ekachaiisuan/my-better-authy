@@ -1,6 +1,11 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { nextCookies } from "better-auth/next-js";
+
 import { prisma } from "@/lib/prisma";
+import { hashPassword,verifyPassword } from "@/lib/argon2"
+import { createAuthMiddleware,APIError } from "better-auth/api";
+import { getValidDomains,normalizeName } from "@/lib/utils";
 
 
 export const auth = betterAuth({
@@ -9,6 +14,57 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {    
         enabled: true,
-        minPasswordLength: 6
-    } 
+        minPasswordLength: 6,
+        autoSignIn: false,
+        password: {
+          hash: hashPassword,
+          verify: verifyPassword
+        }
+    } ,
+    hooks:{
+      before: createAuthMiddleware(async (ctx)=>{
+        if (ctx.path === '/sign-up/email'){
+          const email = String(ctx.body.email)
+          const domain = email.split("@")[1]
+          const VALID_DOMAINS = getValidDomains()
+
+          if (!VALID_DOMAINS.includes(domain)){
+            throw new APIError('BAD_REQUEST',{
+              message: 'ไปดูมาใหม่ว่าให้ใส่ Domain อะไร เดี๊ยวลูกปัด'
+            })
+          }
+
+          const name = normalizeName(ctx.body.name)
+
+          return {
+            context:{
+              ...ctx,
+              body:{
+                ...ctx.body,
+                name,
+              }
+            }
+          }
+        }
+      })
+    },
+    user:{
+      additionalFields:{
+        role: {
+          type: ['USER','ADMIN'],
+          input: false
+        }
+      }
+    },
+    session:{
+      expiresIn: 30 * 24 * 60 * 60,
+    },
+    advanced:{
+      database:{
+        generateId:false
+      }
+    },
+    plugins:[nextCookies()]
 });
+
+export type ErrorCode = keyof typeof auth.$ERROR_CODES | 'UNKHOWN'

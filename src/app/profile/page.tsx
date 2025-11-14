@@ -2,21 +2,34 @@ import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { SignOutButton } from '@/components/signoutbutton';
 import { ReturnButton } from '@/components/returnbutton';
+import { redirect } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+
 
 export default async function Page() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
-  if (!session) {
-    return <p className="text-destructive">Unauthorized</p>;
-  }
+
+  if (!session) redirect('/auth/login')
+
+    
   return (
     <div className="px-8 py-16 container mx-auto max-w-svh space-y-8">
       <div className="space-y-8">
         <ReturnButton href='/' label='Home'></ReturnButton>
         <h1 className="text-3xl font-bold">Profile</h1>
       </div>
-      <SignOutButton/>
+      <div className="flex items-center gap-2">
+        {session.user.role === 'ADMIN' && (
+          <Button size='sm' asChild>
+            <Link href='/admin/dashboard'>Admin Dashboard</Link>
+          </Button>
+        )}
+        <SignOutButton/>
+      </div>
+      
       <pre className="text-sm overflow-clip">
         {JSON.stringify(session, null, 2)}
       </pre>
